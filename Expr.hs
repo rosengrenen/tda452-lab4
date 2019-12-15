@@ -33,7 +33,6 @@ sin,cos :: Expr -> Expr
 sin expr = Func "sin" expr
 cos expr = Func "cos" expr
 
-
 -- B --------------------------------------------------------------------------
 
 showExpr :: Expr -> String
@@ -48,3 +47,15 @@ showExpr' (Op expr1 operand expr2) p
     (precedence, _) = fromJust $ lookup operand operators 
 showExpr' (Func name expr)         _ = name ++ showExpr' expr 999
 showExpr' Var                      _ = "x"
+
+-- C --------------------------------------------------------------------------
+
+eval :: Expr -> Double -> Double
+eval (Num num)                _ = num
+eval (Op expr1 operand expr2) x = eval expr1 x `op` eval expr2 x
+  where
+    (_, op) = fromJust $ lookup operand operators
+eval (Func name expr)         x = func $ eval expr x
+  where
+    func = fromJust $ lookup name functions
+eval Var                      x = x
