@@ -1,5 +1,7 @@
 module Expr where
+import Data.Char
 import Data.Maybe
+import Parsing
 
 -- A --------------------------------------------------------------------------
 
@@ -59,3 +61,17 @@ eval (Func name expr)         x = func $ eval expr x
   where
     func = fromJust $ lookup name functions
 eval Var                      x = x
+
+-- D --------------------------------------------------------------------------
+
+number :: Parser Double
+number = head <$> zeroOrMore readsP
+
+operator :: Parser String
+operator = undefined 
+
+function :: Parser String
+function = undefined
+
+readExpr :: String -> Maybe Expr
+readExpr = undefined
