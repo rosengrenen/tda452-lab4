@@ -115,16 +115,6 @@ func = parseSin <|> parseCos
 parentheses :: Parser Expr
 parentheses = char '(' *> expr <* char ')'
 
--- assoc :: Expr -> Expr
--- assoc Var                  = Var
--- assoc e@(Num _)            = e
--- assoc (Add (Add e e') e'') = assoc (Add e (Add e' e''))
--- assoc (Add e          e')  = Add (assoc e) (assoc e')
--- assoc (Mul (Mul e e') e'') = assoc (Mul e (Mul e' e''))
--- assoc (Mul e          e')  = Mul (assoc e) (assoc e')
--- assoc (Sin e)              = Sin (assoc e)
--- assoc (Cos e)              = Cos (assoc e)
-
 -- E --------------------------------------------------------------------------
 
 prop_ShowReadExpr :: Expr -> Bool
@@ -167,14 +157,16 @@ simplify e | e == simplify' e = e
            | otherwise        = simplify (simplify' e)
 
 simplify' :: Expr -> Expr
-simplify' (Add (Num 0)   (Num num')) = Num num'
-simplify' (Add (Num num) (Num 0)   ) = Num num
-simplify' (Add (Num num) (Num num')) = Num (num + num')
 simplify' (Add Var       Var       ) = Mul (Num 2) Var
+simplify' (Add (Num num) (Num num')) = Num (num + num')
+simplify' (Add (Num 0)   e'        ) = e'
+simplify' (Add e         (Num 0)   ) = e
 simplify' (Add e         e'        ) = Add (simplify e) (simplify e')
+simplify' (Mul (Num num) (Num num')) = Num (num * num')
 simplify' (Mul (Num 0)   _         ) = Num 0
 simplify' (Mul _         (Num 0)   ) = Num 0
-simplify' (Mul (Num num) (Num num')) = Num (num * num')
+simplify' (Mul e         (Num 1)   ) = e
+simplify' (Mul (Num 1)   e         ) = e
 simplify' (Mul e e'                ) = Mul (simplify e) (simplify e')
 simplify' (Sin (Num 0)             ) = Num 0    
 simplify' (Sin e                   ) = Sin (simplify e)

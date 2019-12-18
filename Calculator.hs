@@ -22,15 +22,16 @@ setup window =
      fx         <- mkHTML "<i>f</i>(<i>x</i>)="  -- The text "f(x)="
      draw       <- mkButton "Draw graph"         -- The draw button
      z          <- mkHTML "<i>Zoom</i>="  -- The text "f(x)="
-     zoomButton <- mkButton "Zoom"         -- The draw button
-     zoomInput  <- mkInput 20 "0.04"                -- The formula input
+     zoomButton <- mkButton "Zoom"         
+     zoomInput  <- mkInput 20 "0.04"              
+     diffButton <- mkButton "Differentiate"         
        -- The markup "<i>...</i>" means that the text inside should be rendered
        -- in italics.
 
      -- Add the user interface elements to the page, creating a specific layout
      formula <- row [pure fx,pure input]
      zoom <- row [pure z, pure zoomInput]
-     getBody window #+ [column [pure canvas,pure formula,pure draw, pure zoom, pure zoomButton]]
+     getBody window #+ [column [pure canvas,pure formula,pure draw, pure zoom, pure zoomButton, pure diffButton]]
 
      -- Styling
      getBody window # set style [("backgroundColor","lightblue"),
@@ -38,14 +39,16 @@ setup window =
      pure input # set style [("fontSize","14pt")]
 
      -- Interaction (install event handlers)
-     on UI.click     draw  $ \ _ -> readAndDraw input zoomInput canvas
-     on valueChange' input $ \ _ -> readAndDraw input zoomInput canvas
-     on UI.click     zoomButton  $ \ _ -> readAndDraw input zoomInput canvas
-     on valueChange' zoomInput $ \ _ -> readAndDraw input zoomInput canvas
+     on UI.click     draw  $ \ _ -> readAndDraw input zoomInput canvas False 
+     on valueChange' input $ \ _ -> readAndDraw input zoomInput canvas False 
+     on UI.click     zoomButton  $ \ _ -> readAndDraw input zoomInput canvas False 
+     on valueChange' zoomInput $ \ _ -> readAndDraw input zoomInput canvas False 
+     on UI.click     diffButton $ \ _ -> readAndDraw input zoomInput canvas True
 
 
-readAndDraw :: Element -> Element -> Canvas -> UI ()
-readAndDraw input zoomInput canvas =
+
+readAndDraw :: Element -> Element -> Canvas -> Bool -> UI ()
+readAndDraw input zoomInput canvas shouldDiff =
   do -- Get the current formula (a String) from the input element
      formula <- get value input
      zoom    <- get value zoomInput
@@ -57,6 +60,13 @@ readAndDraw input zoomInput canvas =
      set UI.fillStyle (UI.solidColor (UI.RGB 0 0 0)) (pure canvas)
      UI.fillText formula (10,canHeight/2) canvas
      path "blue" (points expression (read zoom) (canWidth, canHeight)) canvas
+     if shouldDiff
+     then do
+      let diff = differentiate expression
+      path "red" (points diff (read zoom) (canWidth, canHeight)) canvas
+      pure input # set value (showExpr diff)
+      return ()
+     else return ()
 
 -- H --------------------------------------------------------------------------
 
