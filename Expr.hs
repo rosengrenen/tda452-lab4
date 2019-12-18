@@ -159,3 +159,24 @@ rFunc size = do
 
 instance Arbitrary Expr where
   arbitrary = sized arbExpr
+
+-- F --------------------------------------------------------------------------
+
+simplify :: Expr -> Expr
+simplify e | e == simplify' e = e
+           | otherwise        = simplify (simplify' e)
+
+simplify' :: Expr -> Expr
+simplify' (Add (Num num) (Num num')) = Num (num + num')
+simplify' (Add Var       Var       ) = Mul (Num 2) Var
+simplify' (Add e e')                 = Add (simplify e) (simplify e')
+simplify' (Mul (Num num) (Num num')) = Num (num * num')
+simplify' (Mul e e')                 = Mul (simplify e) (simplify e')
+simplify' (Sin (Num 0))              = Num 0    
+simplify' (Sin e)                    = Sin (simplify e)
+simplify' (Cos (Num 0))              = Num 1    
+simplify' (Cos e)                    = Cos (simplify e)
+simplify' e                          = e
+
+prop_simplify :: Expr -> Bool
+prop_simplify e = doubleEq 0.0001 (eval e 1) (eval (simplify e) 1) 
