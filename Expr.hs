@@ -6,72 +6,101 @@ import Parsing
 -- A --------------------------------------------------------------------------
 
 data Expr = Num Double
-  | Op Expr Operand Expr
-  | Func Name Expr
+  | Add Expr Expr
+  | Mul Expr Expr
+  | Sin Expr
+  | Cos Expr
   | Var
   deriving Show
-type Name = String
-type Operand = String
-data Opr = Opr Char (Double -> Double -> Double)
+  
+-- type Name = String
+-- type Operand = Char
 
-operators :: [(String, (Integer, (Double -> Double -> Double)))]
-operators = [
-  ("+", (0, (+))),
-  ("*", (1, (*))) ]
+-- operators :: [(Char, (Integer, Double -> Double -> Double))]
+-- operators = [
+--   ('+', (0, (+))),
+--   ('-', (0, (-))),
+--   ('*', (1, (*))),
+--   ('/', (1, (/))) ]
 
-functions :: [(String, (Double -> Double))]
-functions = [
-  ("cos", Prelude.cos),
-  ("sin", Prelude.sin) ]
+-- functions :: [(String, Double -> Double)]
+-- functions = [
+--   ("cos", Prelude.cos),
+--   ("sin", Prelude.sin) ]
 
 x :: Expr
 x = Var
 num :: Double -> Expr
-num value = Num value
+num = Num
 add,mul :: Expr -> Expr -> Expr
-add expr1 expr2 = Op expr1 "+" expr2
-mul expr1 expr2 = Op expr1 "*" expr2
+add = Add
+mul = Mul
 sin,cos :: Expr -> Expr
-sin expr = Func "sin" expr
-cos expr = Func "cos" expr
+sin = Sin
+cos = Cos
 
 -- B --------------------------------------------------------------------------
 
 showExpr :: Expr -> String
-showExpr expr = showExpr' expr (-1)
+showExpr Var = "x"
+showExpr (Num n) = show n
+showExpr (Add e e') = showExpr e ++ " + " ++ showExpr e'
+showExpr (Mul e e') = showFactor e ++ " * " ++ showFactor e'
+showExpr (Sin e) = "sin" ++ showFunction e
+showExpr (Cos e) = "cos" ++ showFunction e
 
-showExpr' :: Expr -> Integer -> String
-showExpr' (Num num)                _ = show num
-showExpr' (Op expr1 operand expr2) p 
-  | p > precedence = "(" ++ showExpr' expr1 precedence ++ " " ++ operand ++ " " ++ showExpr' expr2 precedence ++ ")"
-  | otherwise      = showExpr' expr1 precedence ++ " " ++ operand ++ " " ++ showExpr' expr2 precedence
-  where
-    (precedence, _) = fromJust $ lookup operand operators 
-showExpr' (Func name expr)         _ = name ++ showExpr' expr 999
-showExpr' Var                      _ = "x"
+showFactor :: Expr -> String
+showFactor e@(Add _ _) = "(" ++ showExpr e ++ ")"
+showFactor e           = showExpr e
+
+showFunction :: Expr -> String
+showFunction e@(Add _ _) = "(" ++ showExpr e ++ ")"
+showFunction e@(Mul _ _) = "(" ++ showExpr e ++ ")"
+showFunction e           = " " ++ showExpr e
 
 -- C --------------------------------------------------------------------------
 
 eval :: Expr -> Double -> Double
-eval (Num num)                _ = num
-eval (Op expr1 operand expr2) x = eval expr1 x `op` eval expr2 x
-  where
-    (_, op) = fromJust $ lookup operand operators
-eval (Func name expr)         x = func $ eval expr x
-  where
-    func = fromJust $ lookup name functions
-eval Var                      x = x
+eval Var        var = var
+eval (Num num)  _   = num
+eval (Add e e') var = eval e var + eval e' var
+eval (Mul e e') var = eval e var * eval e' var
+eval (Sin e)    var = Prelude.sin $ eval e var
+eval (Cos e)    var = Prelude.cos $ eval e var
 
 -- D --------------------------------------------------------------------------
 
-number :: Parser Double
-number = head <$> zeroOrMore readsP
+number :: Parser Expr
+number = Num . head <$> oneOrMore readsP
 
-operator :: Parser String
-operator = undefined 
+parseSin :: Parser Expr
+parseSin = do
+  char 's'
+  char 'i'
+  char 'n'
+  Sin <$> expression
 
-function :: Parser String
-function = undefined
+parseCos :: Parser Expr
+parseCos = do
+  char 'c'
+  char 'o'
+  char 's'
+  Cos <$> expression
 
-readExpr :: String -> Maybe Expr
-readExpr = undefined
+function :: Parser Expr
+function = parseSin <|> parseCos
+
+variable :: Parser Expr
+variable = do char 'x'; return Var
+
+expression :: Parser Expr
+expression = foldl1 Add <$> chain term (char '+')
+
+term :: Parser Expr
+term = foldl1 Mul <$> chain factor (char '*')
+
+factor :: Parser Expr
+factor = number <|> parentheses <|> variable <|> function
+
+parentheses :: Parser Expr
+parentheses = char '(' *> expression <* char ')'
