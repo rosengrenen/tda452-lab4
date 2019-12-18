@@ -167,16 +167,33 @@ simplify e | e == simplify' e = e
            | otherwise        = simplify (simplify' e)
 
 simplify' :: Expr -> Expr
+simplify' (Add (Num 0)   (Num num')) = Num num'
+simplify' (Add (Num num) (Num 0)   ) = Num num
 simplify' (Add (Num num) (Num num')) = Num (num + num')
 simplify' (Add Var       Var       ) = Mul (Num 2) Var
-simplify' (Add e e')                 = Add (simplify e) (simplify e')
+simplify' (Add e         e'        ) = Add (simplify e) (simplify e')
+simplify' (Mul (Num 0)   _         ) = Num 0
+simplify' (Mul _         (Num 0)   ) = Num 0
 simplify' (Mul (Num num) (Num num')) = Num (num * num')
-simplify' (Mul e e')                 = Mul (simplify e) (simplify e')
-simplify' (Sin (Num 0))              = Num 0    
-simplify' (Sin e)                    = Sin (simplify e)
-simplify' (Cos (Num 0))              = Num 1    
-simplify' (Cos e)                    = Cos (simplify e)
+simplify' (Mul e e'                ) = Mul (simplify e) (simplify e')
+simplify' (Sin (Num 0)             ) = Num 0    
+simplify' (Sin e                   ) = Sin (simplify e)
+simplify' (Cos (Num 0)             ) = Num 1    
+simplify' (Cos e                   ) = Cos (simplify e)
 simplify' e                          = e
 
 prop_simplify :: Expr -> Bool
 prop_simplify e = doubleEq 0.0001 (eval e 1) (eval (simplify e) 1) 
+
+-- G --------------------------------------------------------------------------
+
+differentiate :: Expr -> Expr
+differentiate e = simplify (differentiate' (simplify e))
+
+differentiate' :: Expr -> Expr
+differentiate' Var        = Num 1
+differentiate' (Num _)    = Num 0
+differentiate' (Add e e') = Add (differentiate' e) (differentiate' e')
+differentiate' (Mul e e') = Add (Mul (differentiate' e) e') (Mul e (differentiate' e'))
+differentiate' (Cos e)    = Mul (Num (-1)) (Mul (Sin e) (differentiate' e))
+differentiate' (Sin e)    = Mul (Cos e) (differentiate' e)
