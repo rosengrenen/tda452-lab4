@@ -2,6 +2,7 @@ module Expr where
 import Data.Char
 import Data.Maybe
 import Parsing
+import Test.QuickCheck
 
 -- A --------------------------------------------------------------------------
 
@@ -11,7 +12,7 @@ data Expr = Num Double
   | Sin Expr
   | Cos Expr
   | Var
-  deriving Show
+  deriving (Eq, Show)
   
 -- type Name = String
 -- type Operand = Char
@@ -70,37 +71,91 @@ eval (Cos e)    var = Prelude.cos $ eval e var
 
 -- D --------------------------------------------------------------------------
 
+readExpr :: String -> Maybe Expr
+readExpr s = maybeExpr $ parse expr (filter (/=' ') s)
+
+maybeExpr :: Maybe (Expr, String) -> Maybe Expr
+maybeExpr (Just (e, s)) | s == ""    = Just {-- $assoc --}e
+                         | otherwise = Nothing
+maybeExpr Nothing                    = Nothing
+
 number :: Parser Expr
 number = Num . head <$> oneOrMore readsP
+
+
+variable :: Parser Expr
+variable = do char 'x'; return Var
+
+expr :: Parser Expr
+expr = foldl1 Add <$> chain term (char '+')
+
+term :: Parser Expr
+term = foldl1 Mul <$> chain factor (char '*')
+
+factor :: Parser Expr
+factor = parentheses <|> func <|> number <|> variable
 
 parseSin :: Parser Expr
 parseSin = do
   char 's'
   char 'i'
   char 'n'
-  Sin <$> expression
+  Sin <$> factor
 
 parseCos :: Parser Expr
 parseCos = do
   char 'c'
   char 'o'
   char 's'
-  Cos <$> expression
+  Cos <$> factor
 
-function :: Parser Expr
-function = parseSin <|> parseCos
-
-variable :: Parser Expr
-variable = do char 'x'; return Var
-
-expression :: Parser Expr
-expression = foldl1 Add <$> chain term (char '+')
-
-term :: Parser Expr
-term = foldl1 Mul <$> chain factor (char '*')
-
-factor :: Parser Expr
-factor = number <|> parentheses <|> variable <|> function
+func :: Parser Expr
+func = parseSin <|> parseCos
 
 parentheses :: Parser Expr
-parentheses = char '(' *> expression <* char ')'
+parentheses = char '(' *> expr <* char ')'
+
+-- assoc :: Expr -> Expr
+-- assoc Var                  = Var
+-- assoc e@(Num _)            = e
+-- assoc (Add (Add e e') e'') = assoc (Add e (Add e' e''))
+-- assoc (Add e          e')  = Add (assoc e) (assoc e')
+-- assoc (Mul (Mul e e') e'') = assoc (Mul e (Mul e' e''))
+-- assoc (Mul e          e')  = Mul (assoc e) (assoc e')
+-- assoc (Sin e)              = Sin (assoc e)
+-- assoc (Cos e)              = Cos (assoc e)
+
+-- E --------------------------------------------------------------------------
+
+prop_ShowReadExpr :: Expr -> Bool
+prop_ShowReadExpr e = doubleEq 0.0001 (eval (fromJust (readExpr (showExpr e))) 1) (eval e 1)
+
+doubleEq :: Double -> Double -> Double -> Bool
+doubleEq tol a b = tol > abs (a - b)
+
+arbExpr :: Int -> Gen Expr
+arbExpr s = frequency [(1, rNum 4),(1, rVar),(s, rBin s), (s, rFunc s)]
+
+rNum :: Double -> Gen Expr
+rNum range = {--assoc <$> --}elements (map Num [0..range])
+
+rVar :: Gen Expr
+rVar = elements [Var]
+
+rBin :: Int -> Gen Expr
+rBin size = do 
+  let size' = size `div` 2
+  op <- elements [Mul, Add]
+  e <- arbExpr size'
+  e' <- arbExpr size'
+  return $ op e e'
+
+rFunc :: Int -> Gen Expr
+rFunc size = do 
+  let size' = size `div` 2
+  fn <- elements [Sin, Cos]
+  e <- arbExpr size'
+  return $ fn e
+
+instance Arbitrary Expr where
+  arbitrary = sized arbExpr
