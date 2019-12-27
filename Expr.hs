@@ -178,3 +178,4 @@ differentiate' (Operation "+" e e') = Operation "+" (differentiate' e) (differen
 differentiate' (Operation "*" e e') = Operation "+" (Operation "*" (differentiate' e) e') (Operation "*" e (differentiate' e'))
 differentiate' (Function "cos" e)   = Operation "*" (Num (-1)) (Operation "*" (Function "sin" e) (differentiate' e))
 differentiate' (Function "sin" e)   = Operation "*" (Function "cos" e) (differentiate' e)
+differentiate' e                    = error "The calculator does not support differentating this expression"
